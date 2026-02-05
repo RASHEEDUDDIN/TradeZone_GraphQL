@@ -3,7 +3,8 @@ import { TextField, Button, Typography, Container, Snackbar, Dialog, DialogTitle
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { login } from './store/authSlice';
-import { userService } from '../services/dbService';
+import { useMutation } from '@apollo/client';
+import { LOGIN } from '../graphql/mutations';
 
 const UserLogin = () => {
     const [username, setUsername] = useState('');
@@ -17,6 +18,9 @@ const UserLogin = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
+    // GraphQL Login Mutation
+    const [loginMutation, { loading }] = useMutation(LOGIN);
+
     useEffect(() => {
         console.log('userName:', userName);
         console.log('userRole:', userRole);
@@ -29,80 +33,43 @@ const UserLogin = () => {
 
     const handleLogin = async () => {
         try {
-            const user = await userService.login(username, password);
-            
-            if (!user) {
-                throw new Error('Invalid username or password');
+            const { data } = await loginMutation({
+                variables: {
+                    username: username,
+                    password: password
+                }
+            });
+
+            const result = data.login;
+
+            if (!result.success) {
+                throw new Error(result.message || 'Invalid username or password');
             }
 
-            if (user.status === 'banned') {
-                setBannedMessage(`You have been banned by admin ${user.bannedBy}. Please contact admin ${user.bannedBy}`);
-                setShowBannedDialog(true);
-                return;
-            }
+            // Store token in localStorage
+            localStorage.setItem('token', result.token);
+            localStorage.setItem('username', result.user.username);
+            localStorage.setItem('userRole', result.user.role);
+            localStorage.setItem('userId', result.user.id);
 
-            // Update auth state
+            // Update Redux state
             dispatch(login({
-                username: user.username,
-                userRole: user.role
+                username: result.user.username,
+                userRole: result.user.role
             }));
 
-            // Update localStorage
-            localStorage.setItem('username', user.username);
-            localStorage.setItem('userRole', user.role);
-
-            setSuccessMessage(`Welcome, ${username}!`);
-            navigate('/user/dashboard');
+            setSuccessMessage(`Welcome, ${result.user.username}!`);
+            
+            // Navigate based on role
+            if (result.user.role === 'admin') {
+                navigate('/admin/dashboard');
+            } else {
+                navigate('/user/dashboard');
+            }
         } catch (error) {
             setSuccessMessage(error.message || 'An error occurred during login. Please try again.');
         }
     };
-    // const handleLogin = async () => {
-    //     try {
-    //         const response = await fetch('https://smooth-comfort-405104.uc.r.appspot.com/document/findAll/users', {
-    //             method: 'GET',
-    //             headers: {
-    //                 'Authorization': `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MTg5Yjk2Y2FhNWVjNzQ5NDQxMThiNyIsInVzZXJuYW1lIjoibW9oYW1tZWQuZ0Bub3J0aGVhc3Rlcm4uZWR1IiwiaWF0IjoxNzI5NjY1OTQ4LCJleHAiOjE3MzE4MjU5NDh9.zt_Nr2QKj06ocTkCO_fpXrtspfjIbDLJI_MTzT9zWgQ`,
-    //             },
-    //         });
-
-    //         if (response.ok) {
-    //             const responseData = await response.json();
-    //             const userData = responseData.data.find(user => user.username === username && user.password === password);
-
-    //             if (userData) {
-
-    //                 if (userData.status === 'banned') {
-    //                     console.log('banned ', userData);
-    //                     setBannedMessage(`You have been banned by admin ${userData.bannedBy}. Please contact admin ${userData.bannedBy}`);
-    //                     setShowBannedDialog(true);
-    //                 } else {
-    //                     console.log('active ', userData);
-    //                     setSuccessMessage(`User ${userData.username} logged in successfully!`);
-
-    //                     dispatch(login({ username: userData.username, userRole: 'user' }));
-    //                     console.log("Logged in as ", userData.username);
-
-
-    //                     if (userData.role === 'user') {
-    //                         setTimeout(() => {
-    //                             navigate('/user/dashboard');
-    //                             setSuccessMessage('');
-    //                         }, 2000);
-    //                     }
-    //                 }
-    //             } else {
-    //                 alert('Invalid username or password');
-    //             }
-    //         } else {
-    //             const errorData = await response.json();
-    //             alert(`Login failed: ${errorData.message || 'Unknown error'}`);
-    //         }
-    //     } catch (error) {
-    //         console.error('Error during login:', error);
-    //         alert('An error occurred during login. Please try again.');
-    //     }
-    // };
 
     return (
         <Container maxWidth="sm">
@@ -127,9 +94,10 @@ const UserLogin = () => {
                 color="primary"
                 fullWidth
                 onClick={handleLogin}
+                disabled={loading}
                 sx={{ mt: 2 }}
             >
-                Login
+                {loading ? 'Logging in...' : 'Login'}
             </Button>
             <Button
                 variant="outlined"
