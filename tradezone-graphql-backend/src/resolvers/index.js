@@ -67,15 +67,24 @@ const resolvers = {
   Mutation: {
     register: async (_, { input }) => {
       try {
-        const existingUser = await User.findOne({ username: input.username });
-        if (existingUser) {
+        const existingUsername = await User.findOne({ username: input.username });
+        if (existingUsername) {
           return { success: false, message: 'Username already exists', user: null, token: null };
+        }
+
+        const existingEmail = await User.findOne({ email: input.email });
+        if (existingEmail) {
+          return { success: false, message: 'Email already exists', user: null, token: null };
         }
 
         const user = new User({
           username: input.username,
+          email: input.email,
           password: input.password,
-          role: input.role || 'user'
+          contactDetails: input.contactDetails || '',
+          role: input.role || 'user',
+          status: 'active',
+          listedItems: []
         });
         await user.save();
 
@@ -83,7 +92,14 @@ const resolvers = {
         return {
           success: true,
           message: 'Registration successful',
-          user: { id: user._id, username: user.username, role: user.role },
+          user: {
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            contactDetails: user.contactDetails,
+            role: user.role,
+            status: user.status
+          },
           token
         };
       } catch (error) {
@@ -98,6 +114,10 @@ const resolvers = {
           return { success: false, message: 'User not found', user: null, token: null };
         }
 
+        if (user.status === 'banned') {
+          return { success: false, message: 'Your account has been banned.', user: null, token: null };
+        }
+
         const isValid = await user.comparePassword(password);
         if (!isValid) {
           return { success: false, message: 'Invalid password', user: null, token: null };
@@ -107,7 +127,14 @@ const resolvers = {
         return {
           success: true,
           message: 'Login successful',
-          user: { id: user._id, username: user.username, role: user.role },
+          user: {
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            contactDetails: user.contactDetails,
+            role: user.role,
+            status: user.status
+          },
           token
         };
       } catch (error) {

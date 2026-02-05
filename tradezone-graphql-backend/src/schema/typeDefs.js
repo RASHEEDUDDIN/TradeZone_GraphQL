@@ -4,7 +4,11 @@ const typeDefs = gql`
   type User {
     id: ID!
     username: String!
+    email: String!
+    contactDetails: String
     role: String!
+    status: String
+    listedItems: [String]
     createdAt: String
   }
 
@@ -48,7 +52,9 @@ const typeDefs = gql`
 
   input RegisterInput {
     username: String!
+    email: String!
     password: String!
+    contactDetails: String
     role: String
   }
 

@@ -10,7 +10,10 @@ export const REGISTER = gql`
       user {
         id
         username
+        email
+        contactDetails
         role
+        status
       }
     }
   }
