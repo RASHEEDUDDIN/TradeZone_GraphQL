@@ -1,255 +1,324 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, Grid, Card, CardContent, CardMedia, Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Typography, Button, Grid, Card, CardContent, CardMedia, Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton, CircularProgress } from '@mui/material';
 import { Add, Delete, Edit } from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
-import { itemService } from '../services/dbService';
-import { fetchItems } from './store/itemSlice';
+import { useSelector } from 'react-redux';
+import { useQuery, useMutation } from '@apollo/client';
+import { GET_MY_ITEMS } from '../graphql/queries';
+import { CREATE_ITEM, UPDATE_ITEM, DELETE_ITEM } from '../graphql/mutations';
 
 const UserDashboard = () => {
-
-    const items = useSelector((state) => state.items.items);
-
     const [openAdd, setOpenAdd] = useState(false);
-    const [newItem, setNewItem] = useState({ itemName: '', itemDescription: '', itemPrice: '', itemImage: null });
-    const [selectedItem, setSelectedItem] = useState(null);
     const [openEdit, setOpenEdit] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [newItem, setNewItem] = useState({ name: '', description: '', price: '', image: '' });
+    
     const { userName, userRole } = useSelector((state) => state.auth);
-    const dispatch = useDispatch();
-    const userItems = items.filter(item => item.userName === userName);
 
-    useEffect(() => {
-        console.log('User Role:', userRole);
-        console.log('Is Logged In:', userName);
-    }, [userName, userRole]);
+    // GraphQL Query - Fetch user's items
+    const { loading, error, data, refetch } = useQuery(GET_MY_ITEMS);
+
+    // GraphQL Mutations
+    const [createItem, { loading: creating }] = useMutation(CREATE_ITEM, {
+        onCompleted: () => {
+            refetch();
+            setOpenAdd(false);
+            setNewItem({ name: '', description: '', price: '', image: '' });
+        }
+    });
+
+    const [updateItem, { loading: updating }] = useMutation(UPDATE_ITEM, {
+        onCompleted: () => {
+            refetch();
+            setOpenEdit(false);
+            setSelectedItem(null);
+            setNewItem({ name: '', description: '', price: '', image: '' });
+        }
+    });
+
+    const [deleteItem, { loading: deleting }] = useMutation(DELETE_ITEM, {
+        onCompleted: () => {
+            refetch();
+        }
+    });
+
+    const userItems = data?.myItems || [];
 
     const handleAddItem = async () => {
+        if (!newItem.name || !newItem.price) {
+            alert('Please fill in item name and price');
+            return;
+        }
+
         try {
-            const item = {
-                itemName: newItem.itemName,
-                itemDescription: newItem.itemDescription,
-                itemPrice: parseFloat(newItem.itemPrice),
-                itemImage: newItem.itemImage,
-                userName,
-                itemCreationDate: new Date().toISOString(),
-                status: 'active'
-            };
-            await itemService.create(item);
-            setNewItem({ itemName: '', itemDescription: '', itemPrice: '', itemImage: null });
-            setOpenAdd(false);
-            dispatch(fetchItems());
-        } catch (error) {
-            console.error('Error creating item:', error);
+            await createItem({
+                variables: {
+                    input: {
+                        name: newItem.name,
+                        description: newItem.description,
+                        price: parseFloat(newItem.price),
+                        image: newItem.image,
+                        category: 'General'
+                    }
+                }
+            });
+            alert('Item created successfully!');
+        } catch (err) {
+            console.error('Error creating item:', err);
             alert('Error creating item. Please try again.');
         }
     };
 
     const handleEditItem = async () => {
+        if (!selectedItem) return;
+
         try {
-            if (!selectedItem) return;
-            const updatedItem = {
-                ...selectedItem,
-                itemName: newItem.itemName || selectedItem.itemName,
-                itemDescription: newItem.itemDescription || selectedItem.itemDescription,
-                itemPrice: parseFloat(newItem.itemPrice) || selectedItem.itemPrice,
-                itemImage: newItem.itemImage || selectedItem.itemImage
-            };
-            await itemService.update(selectedItem.id, updatedItem);
-            setSelectedItem(null);
-            setOpenEdit(false);
-            dispatch(fetchItems());
-        } catch (error) {
-            console.error('Error updating item:', error);
+            await updateItem({
+                variables: {
+                    id: selectedItem.id,
+                    input: {
+                        name: newItem.name || selectedItem.name,
+                        description: newItem.description || selectedItem.description,
+                        price: parseFloat(newItem.price) || selectedItem.price,
+                        image: newItem.image || selectedItem.image,
+                        category: selectedItem.category || 'General'
+                    }
+                }
+            });
+            alert('Item updated successfully!');
+        } catch (err) {
+            console.error('Error updating item:', err);
             alert('Error updating item. Please try again.');
         }
     };
 
     const handleDeleteItem = async (itemId) => {
         if (!window.confirm('Are you sure you want to delete this item?')) return;
+
         try {
-            await itemService.delete(itemId);
-            dispatch(fetchItems());
-        } catch (error) {
-            console.error('Error deleting item:', error);
+            await deleteItem({
+                variables: { id: itemId }
+            });
+            alert('Item deleted successfully!');
+        } catch (err) {
+            console.error('Error deleting item:', err);
             alert('Error deleting item. Please try again.');
         }
     };
 
-    const handleImageUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setNewItem({ ...newItem, itemImage: reader.result });
-            };
-            reader.readAsDataURL(file);
-        }
+    const openEditDialog = (item) => {
+        setSelectedItem(item);
+        setNewItem({
+            name: item.name,
+            description: item.description || '',
+            price: item.price.toString(),
+            image: item.image || ''
+        });
+        setOpenEdit(true);
     };
+
+    // Loading state
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <Box p={3}>
+                <Typography color="error">Error loading items: {error.message}</Typography>
+            </Box>
+        );
+    }
 
     return (
         <Box p={3}>
             <Typography variant="h4" gutterBottom>User Dashboard</Typography>
+            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                Welcome, {userName}!
+            </Typography>
             
             <Button
                 variant="contained"
                 color="primary"
                 startIcon={<Add />}
-                onClick={() => setOpenAdd(true)}
-                sx={{ mb: 2 }}
+                onClick={() => {
+                    setNewItem({ name: '', description: '', price: '', image: '' });
+                    setOpenAdd(true);
+                }}
+                sx={{ mb: 3 }}
             >
                 Add New Item
             </Button>
 
-            <Grid container spacing={2}>
-                {userItems.map((item) => (
-                    <Grid item xs={12} sm={6} md={4} key={item.id}>
-                         <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                            <CardMedia
-                                component="img"
-                                height="200"
-                                image={item.itemImage || '/default-image.jpg'}
-                                alt={item.itemName}
-                                sx={{
-                                    objectFit: 'contain',
-                                    borderRadius: 1
-                                }}
-                            />
-                            <CardContent sx={{ flexGrow: 1 }}>
-                                <Typography variant="h6" gutterBottom>
-                                    {item.itemName}
-                                </Typography>
-                                <Typography variant="body2" color="textSecondary" paragraph>
-                                    {item.itemDescription}
-                                </Typography>
-                                <Typography variant="h6" color="primary" gutterBottom>
-                                    ${item.itemPrice}
-                                </Typography>
-                            </CardContent>
-                            <Box sx={{ 
-                                display: 'flex', 
-                                gap: 1, 
-                                p: 1, 
-                                bgcolor: 'background.paper',
-                                borderTop: '1px solid',
-                                borderColor: 'divider'
-                            }}>
-                                <IconButton
-                                    color="primary"
-                                    onClick={() => {
-                                        setSelectedItem(item);
-                                        setOpenEdit(true);
+            {userItems.length === 0 ? (
+                <Typography color="text.secondary">
+                    You haven't listed any items yet. Click "Add New Item" to get started!
+                </Typography>
+            ) : (
+                <Grid container spacing={2}>
+                    {userItems.map((item) => (
+                        <Grid item xs={12} sm={6} md={4} key={item.id}>
+                            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                <CardMedia
+                                    component="img"
+                                    height="200"
+                                    image={item.image || '/default-image.jpg'}
+                                    alt={item.name}
+                                    sx={{
+                                        objectFit: 'contain',
+                                        borderRadius: 1
                                     }}
-                                >
-                                    <Edit />
-                                </IconButton>
-                                <IconButton
-                                    color="error"
-                                    onClick={() => handleDeleteItem(item.id)}
-                                >
-                                    <Delete />
-                                </IconButton>
-                            </Box>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
+                                />
+                                <CardContent sx={{ flexGrow: 1 }}>
+                                    <Typography variant="h6" gutterBottom>
+                                        {item.name}
+                                    </Typography>
+                                    <Typography variant="body2" color="textSecondary" paragraph>
+                                        {item.description || 'No description'}
+                                    </Typography>
+                                    <Typography variant="h6" color="primary" gutterBottom>
+                                        ${item.price}
+                                    </Typography>
+                                    {item.category && (
+                                        <Typography variant="body2" color="text.secondary">
+                                            Category: {item.category}
+                                        </Typography>
+                                    )}
+                                </CardContent>
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    gap: 1, 
+                                    p: 1, 
+                                    bgcolor: 'background.paper',
+                                    borderTop: '1px solid',
+                                    borderColor: 'divider'
+                                }}>
+                                    <IconButton
+                                        color="primary"
+                                        onClick={() => openEditDialog(item)}
+                                        disabled={updating}
+                                    >
+                                        <Edit />
+                                    </IconButton>
+                                    <IconButton
+                                        color="error"
+                                        onClick={() => handleDeleteItem(item.id)}
+                                        disabled={deleting}
+                                    >
+                                        <Delete />
+                                    </IconButton>
+                                </Box>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
 
+            {/* Add Item Dialog */}
             <Dialog open={openAdd} onClose={() => setOpenAdd(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>Add New Item</DialogTitle>
                 <DialogContent>
                     <TextField
                         fullWidth
                         label="Item Name"
-                        value={newItem.itemName}
-                        onChange={(e) => setNewItem({ ...newItem, itemName: e.target.value })}
-                        sx={{ mb: 2 }}
+                        value={newItem.name}
+                        onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                        sx={{ mt: 2, mb: 2 }}
+                        required
                     />
                     <TextField
                         fullWidth
                         multiline
-                        rows={4}
+                        rows={3}
                         label="Description"
-                        value={newItem.itemDescription}
-                        onChange={(e) => setNewItem({ ...newItem, itemDescription: e.target.value })}
+                        value={newItem.description}
+                        onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                         sx={{ mb: 2 }}
                     />
                     <TextField
                         fullWidth
                         label="Price"
                         type="number"
-                        value={newItem.itemPrice}
-                        onChange={(e) => setNewItem({ ...newItem, itemPrice: e.target.value })}
+                        value={newItem.price}
+                        onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
                         sx={{ mb: 2 }}
+                        required
+                        inputProps={{ min: 0, step: 0.01 }}
                     />
-                    <input
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        id="raised-button-file"
-                        type="file"
-                        onChange={handleImageUpload}
+                    <TextField
+                        fullWidth
+                        label="Image URL"
+                        value={newItem.image}
+                        onChange={(e) => setNewItem({ ...newItem, image: e.target.value })}
+                        placeholder="https://example.com/image.jpg"
+                        helperText="Enter a URL for the item image"
                     />
-                    <label htmlFor="raised-button-file">
-                        <Button
-                            variant="contained"
-                            component="span"
-                            startIcon={<Add />}
-                        >
-                            Upload Image
-                        </Button>
-                    </label>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpenAdd(false)}>Cancel</Button>
-                    <Button onClick={handleAddItem} color="primary">Add Item</Button>
+                    <Button 
+                        onClick={handleAddItem} 
+                        color="primary" 
+                        variant="contained"
+                        disabled={creating}
+                    >
+                        {creating ? 'Adding...' : 'Add Item'}
+                    </Button>
                 </DialogActions>
             </Dialog>
 
+            {/* Edit Item Dialog */}
             <Dialog open={openEdit} onClose={() => setOpenEdit(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>Edit Item</DialogTitle>
                 <DialogContent>
                     <TextField
                         fullWidth
                         label="Item Name"
-                        value={newItem.itemName}
-                        onChange={(e) => setNewItem({ ...newItem, itemName: e.target.value })}
-                        sx={{ mb: 2 }}
+                        value={newItem.name}
+                        onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                        sx={{ mt: 2, mb: 2 }}
                     />
                     <TextField
                         fullWidth
                         multiline
-                        rows={4}
+                        rows={3}
                         label="Description"
-                        value={newItem.itemDescription}
-                        onChange={(e) => setNewItem({ ...newItem, itemDescription: e.target.value })}
+                        value={newItem.description}
+                        onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                         sx={{ mb: 2 }}
                     />
                     <TextField
                         fullWidth
                         label="Price"
                         type="number"
-                        value={newItem.itemPrice}
-                        onChange={(e) => setNewItem({ ...newItem, itemPrice: e.target.value })}
+                        value={newItem.price}
+                        onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
                         sx={{ mb: 2 }}
+                        inputProps={{ min: 0, step: 0.01 }}
                     />
-                    <input
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        id="raised-button-file-edit"
-                        type="file"
-                        onChange={handleImageUpload}
+                    <TextField
+                        fullWidth
+                        label="Image URL"
+                        value={newItem.image}
+                        onChange={(e) => setNewItem({ ...newItem, image: e.target.value })}
+                        placeholder="https://example.com/image.jpg"
+                        helperText="Enter a URL for the item image"
                     />
-                    <label htmlFor="raised-button-file-edit">
-                        <Button
-                            variant="contained"
-                            component="span"
-                            startIcon={<Add />}
-                        >
-                            Upload Image
-                        </Button>
-                    </label>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpenEdit(false)}>Cancel</Button>
-                    <Button onClick={handleEditItem} color="primary">Save Changes</Button>
+                    <Button 
+                        onClick={handleEditItem} 
+                        color="primary"
+                        variant="contained"
+                        disabled={updating}
+                    >
+                        {updating ? 'Saving...' : 'Save Changes'}
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

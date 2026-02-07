@@ -9,15 +9,33 @@ import { ApolloProvider } from '@apollo/client';
 import client from './graphql/client';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <ApolloProvider client={client}>
-    <Provider store={store}>
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>
-    </Provider>
-  </ApolloProvider>
-);
 
+// ✅ Clear Apollo cache before rendering to fix status field issue
+client.resetStore().then(() => {
+  console.log('✅ Apollo cache reset successfully');
+  
+  root.render(
+    <ApolloProvider client={client}>
+      <Provider store={store}>
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      </Provider>
+    </ApolloProvider>
+  );
+}).catch(err => {
+  console.error('❌ Error resetting cache:', err);
+  
+  // Render anyway even if cache reset fails
+  root.render(
+    <ApolloProvider client={client}>
+      <Provider store={store}>
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      </Provider>
+    </ApolloProvider>
+  );
+});
 
 reportWebVitals();

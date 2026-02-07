@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     Box, 
@@ -11,11 +11,13 @@ import {
     Dialog, 
     DialogContent, 
     DialogTitle,
-    Chip
+    Chip,
+    CircularProgress
 } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { addToCart } from './store/authSlice';
-import { fetchItems } from './store/itemSlice';
+import { useQuery } from '@apollo/client';
+import { GET_ITEMS } from '../graphql/queries';
 
 function Marketplace() {
     const navigate = useNavigate();
@@ -23,19 +25,15 @@ function Marketplace() {
     const { userName = '', userRole = '', cart = [] } = authState;
     const [selectedItem, setSelectedItem] = useState(null);
     const dispatch = useDispatch();
-    const items = useSelector((state) => state.items?.items || []); // Add fallback to empty array
 
-    // Filter items based on user role and ownership
-    const filteredItems = items.filter(item => {
-        // Show all items
-        return item; // Just return true to show all items
-    });
+    // GraphQL Query to fetch items
+    const { loading, error, data } = useQuery(GET_ITEMS);
+
+    const items = data?.items || [];
 
     const showPurchaseButton = (item) => {
-        // Only show Add to Cart button if user is logged in as a regular user AND is not the item owner
-        if (!item || !item.id) return false; // Use id instead of _id
+        if (!item || !item.id) return false;
         if (userName && userRole === 'user') {
-            // Check if item is not in cart AND user is not the owner of the item
             return !cart.some(cartItem => cartItem?.id === item.id) && item.userName !== userName;
         }
         return false;
@@ -43,7 +41,7 @@ function Marketplace() {
 
     const getButtonContent = (item) => {
         if (!userName || userRole !== 'user') {
-            return null; // Not logged in or not a user
+            return null;
         }
         if (item.userName === userName) {
             return (
@@ -53,10 +51,7 @@ function Marketplace() {
             );
         }
         if (cart.some(cartItem => cartItem?.id === item.id)) {
-            return null; // Item is already in cart
-        }
-        if (item.status === 'banned') {
-            return null; // Item is banned
+            return null;
         }
         return (
             <Button variant="contained" onClick={() => handleAddToCart(item)}>
@@ -70,26 +65,23 @@ function Marketplace() {
         alert('Item added to cart');
     };
 
-    const handleViewDetails = (item) => {
-        setSelectedItem(item);
-    };
+    // Loading state
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
 
-    useEffect(() => {
-        dispatch(fetchItems());
-    }, [dispatch]);
-
-    useEffect(() => {
-        console.log("Updated Auth State:", { userName, userRole });
-        console.log("Selected Item UserName:", selectedItem?.userName);
-    }, [userName, userRole, selectedItem]);
-
-    useEffect(() => {
-        console.log("Full Redux State:", items);
-        console.log("Updated Auth State:", { userName, userRole });
-        console.log("Selected Item UserName:", selectedItem?.userName);
-    }, [items, userName, userRole, selectedItem]);
-
-
+    // Error state
+    if (error) {
+        return (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+                <Typography color="error">Error loading items: {error.message}</Typography>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ p: 3, bgcolor: 'background.paper', minHeight: '100vh' }}>
@@ -101,61 +93,69 @@ function Marketplace() {
             }}>
                 Marketplace
             </Typography>
-            <Grid container spacing={4}>
-                {filteredItems.map((item) => (
-                    <Grid item xs={12} sm={6} md={4} key={item.id}>
-                        <Card sx={{ 
-                            height: '100%', 
-                            display: 'flex', 
-                            flexDirection: 'column',
-                            boxShadow: 3,
-                            borderRadius: 2
-                        }}>
-                            <CardMedia
-                                component="img"
-                                height="200"
-                                image={item.itemImage || '/default-image.jpg'}
-                                alt={item.itemName}
-                                sx={{
-                                    objectFit: 'contain',
-                                    borderRadius: 2
-                                }}
-                            />
-                            <CardContent>
-                                <Typography gutterBottom variant="h5" component="h2">
-                                    {item.itemName || 'No Name'}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    ${item.itemPrice || 0}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {item.itemDescription || 'No description'}
-                                </Typography>
-                                <Chip
-                                    label={`Posted by: ${item.userName || 'Unknown'}`}
-                                    size="small"
+            
+            {items.length === 0 ? (
+                <Typography variant="h6" align="center" color="text.secondary">
+                    No items available in the marketplace.
+                </Typography>
+            ) : (
+                <Grid container spacing={4}>
+                    {items.map((item) => (
+                        <Grid item xs={12} sm={6} md={4} key={item.id}>
+                            <Card sx={{ 
+                                height: '100%', 
+                                display: 'flex', 
+                                flexDirection: 'column',
+                                boxShadow: 3,
+                                borderRadius: 2
+                            }}>
+                                <CardMedia
+                                    component="img"
+                                    height="200"
+                                    image={item.image || '/default-image.jpg'}
+                                    alt={item.name}
                                     sx={{
-                                        bgcolor: 'grey.100',
-                                        color: 'text.secondary',
-                                        mb: 2
+                                        objectFit: 'contain',
+                                        borderRadius: 2
                                     }}
                                 />
-                                {item.status === 'banned' && (
-                                    <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-                                        This item has been banned by admin {item.bannedBy || 'Unknown'}
+                                <CardContent>
+                                    <Typography gutterBottom variant="h5" component="h2">
+                                        {item.name || 'No Name'}
                                     </Typography>
-                                )}
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    ID: {item.id}
-                                </Typography>
-                            </CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1 }}>
-                                {getButtonContent(item)}
-                            </Box>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
+                                    <Typography variant="h6" color="primary" sx={{ mb: 1 }}>
+                                        ${item.price || 0}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        {item.description || 'No description'}
+                                    </Typography>
+                                    {item.category && (
+                                        <Chip
+                                            label={item.category}
+                                            size="small"
+                                            color="primary"
+                                            variant="outlined"
+                                            sx={{ mb: 1, mr: 1 }}
+                                        />
+                                    )}
+                                    <Chip
+                                        label={`Posted by: ${item.userName || 'Unknown'}`}
+                                        size="small"
+                                        sx={{
+                                            bgcolor: 'grey.100',
+                                            color: 'text.secondary',
+                                            mb: 2
+                                        }}
+                                    />
+                                </CardContent>
+                                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                                    {getButtonContent(item)}
+                                </Box>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
 
             <Dialog
                 open={!!selectedItem}
@@ -176,15 +176,15 @@ function Marketplace() {
                     color: 'primary.main',
                     fontWeight: 'bold'
                 }}>
-                    {selectedItem?.itemName}
+                    {selectedItem?.name}
                 </DialogTitle>
                 <DialogContent>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                         <CardMedia
                             component="img"
                             height="400"
-                            image={selectedItem?.itemImage}
-                            alt={selectedItem?.itemName}
+                            image={selectedItem?.image || '/default-image.jpg'}
+                            alt={selectedItem?.name}
                             sx={{
                                 width: '100%',
                                 maxWidth: 600,
@@ -199,21 +199,21 @@ function Marketplace() {
                                 color: 'primary.main',
                                 fontWeight: 'bold'
                             }}>
-                                {selectedItem?.itemName}
+                                {selectedItem?.name}
                             </Typography>
                             <Typography variant="body1" sx={{
                                 mb: 2,
                                 lineHeight: 1.6,
                                 color: 'text.secondary'
                             }}>
-                                {selectedItem?.itemDescription}
+                                {selectedItem?.description}
                             </Typography>
                             <Typography variant="h4" component="div" sx={{
                                 mb: 2,
                                 color: 'primary.main',
                                 fontWeight: 'bold'
                             }}>
-                                ${selectedItem?.itemPrice}
+                                ${selectedItem?.price}
                             </Typography>
                             <Chip
                                 label={`Posted by: ${selectedItem?.userName}`}
@@ -244,38 +244,16 @@ function Marketplace() {
                                         Add to Cart
                                     </Typography>
                                 </Button>
-                            ) : userName ? (
+                            ) : !userName ? (
                                 <Button
                                     variant="contained"
                                     color="primary"
-                                    size="large"
-                                    onClick={() => navigate('/login')}
+                                    onClick={() => navigate('/user-login')}
                                     sx={{
                                         textTransform: 'none',
                                         borderRadius: 2,
                                         py: 1.5,
-                                        width: '100%',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    <Typography variant="button" sx={{
-                                        fontWeight: 'bold',
-                                        fontSize: '1.1rem'
-                                    }}>
-                                        Add to Cart
-                                    </Typography>
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={() => navigate('/login')}
-                                    sx={{
-                                        textTransform: 'none',
-                                        borderRadius: 2,
-                                        py: 1.5,
-                                        width: '100%',
-                                        cursor: 'pointer'
+                                        width: '100%'
                                     }}
                                 >
                                     <Typography variant="button" sx={{
@@ -285,7 +263,7 @@ function Marketplace() {
                                         Login to Add to Cart
                                     </Typography>
                                 </Button>
-                            )}
+                            ) : null}
                         </Box>
                     </Box>
                 </DialogContent>

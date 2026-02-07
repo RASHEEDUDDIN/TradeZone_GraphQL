@@ -8,7 +8,6 @@ const httpLink = createHttpLink({
 
 // Add auth token to every request
 const authLink = setContext((_, { headers }) => {
-  // Get token from localStorage
   const token = localStorage.getItem('token');
   
   return {
@@ -19,10 +18,41 @@ const authLink = setContext((_, { headers }) => {
   };
 });
 
-// Create Apollo Client
+// Create Apollo Client with improved cache policies
 const client = new ApolloClient({
   link: authLink.concat(httpLink),
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    typePolicies: {
+      Query: {
+        fields: {
+          // Force users query to always use fresh data
+          users: {
+            merge(existing, incoming) {
+              return incoming;
+            }
+          },
+          // Force items query to always use fresh data
+          allItems: {
+            merge(existing, incoming) {
+              return incoming;
+            }
+          }
+        }
+      }
+    }
+  }),
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: 'network-only',
+      nextFetchPolicy: 'network-only', // ✅ Changed to stay network-only
+    },
+    query: {
+      fetchPolicy: 'network-only',
+    },
+    mutate: {
+      fetchPolicy: 'network-only',
+    }
+  },
 });
 
 export default client;

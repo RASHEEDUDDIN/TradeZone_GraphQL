@@ -10,8 +10,7 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: true,
-    unique: true,
+    default: '',
     trim: true
   },
   password: {
@@ -31,6 +30,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'banned'],
     default: 'active'
+  },
+  bannedBy: {
+    type: String,
+    default: null
   },
   listedItems: {
     type: [String],

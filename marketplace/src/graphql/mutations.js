@@ -105,3 +105,55 @@ export const UPDATE_TRANSACTION_STATUS = gql`
     }
   }
 `;
+
+// Admin: Ban item
+export const BAN_ITEM = gql`
+  mutation BanItem($id: ID!, $bannedBy: String!) {
+    banItem(id: $id, bannedBy: $bannedBy) {
+      id
+      name
+      status
+      bannedBy
+    }
+  }
+`;
+
+// Admin: Unban item
+export const UNBAN_ITEM = gql`
+  mutation UnbanItem($id: ID!) {
+    unbanItem(id: $id) {
+      id
+      name
+      status
+    }
+  }
+`;
+
+// Admin: Ban user
+export const BAN_USER = gql`
+  mutation BanUser($id: ID!, $bannedBy: String!) {
+    banUser(id: $id, bannedBy: $bannedBy) {
+      id
+      username
+      status
+    }
+  }
+`;
+
+// Admin: Unban user
+export const UNBAN_USER = gql`
+  mutation UnbanUser($id: ID!) {
+    unbanUser(id: $id) {
+      id
+      username
+      status
+    }
+  }
+`;
+
+// Admin: Delete user
+export const DELETE_USER = gql`
+  mutation DeleteUser($id: ID!) {
+    deleteUser(id: $id)
+  }
+`;

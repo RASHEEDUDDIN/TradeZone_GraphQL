@@ -1,52 +1,87 @@
 import React, { useState } from 'react';
-import { Container, TextField, Button, Typography } from '@mui/material';
+import { Container, TextField, Button, Typography, MenuItem, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { useMutation } from '@apollo/client';
+import { CREATE_ITEM } from '../graphql/mutations';
+import { GET_ITEMS } from '../graphql/queries';
 
 const AddItem = () => {
     const [itemName, setItemName] = useState('');
     const [itemDescription, setItemDescription] = useState('');
     const [itemPrice, setItemPrice] = useState('');
-    const [itemImage, setItemImage] = useState(null);
+    const [itemImage, setItemImage] = useState('');
+    const [itemCategory, setItemCategory] = useState('General');
+    const [error, setError] = useState('');
+    
     const navigate = useNavigate();
+
+    // GraphQL Mutation
+    const [createItem, { loading }] = useMutation(CREATE_ITEM, {
+        // Refetch items after creating new one
+        refetchQueries: [{ query: GET_ITEMS }]
+    });
+
+    const categories = [
+        'General',
+        'Electronics',
+        'Clothing',
+        'Books',
+        'Home & Garden',
+        'Sports',
+        'Toys',
+        'Other'
+    ];
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const userId = localStorage.getItem('userId');
+        setError('');
 
-        const formData = new FormData();
-        formData.append('itemName', itemName);
-        formData.append('itemDescription', itemDescription);
-        formData.append('itemPrice', itemPrice);
-        formData.append('itemImage', itemImage);
-        formData.append('createdBy', userId);
-        formData.append('createdAt', new Date().toISOString());
+        // Validation
+        if (!itemName.trim()) {
+            setError('Item name is required');
+            return;
+        }
+        if (!itemPrice || parseFloat(itemPrice) <= 0) {
+            setError('Please enter a valid price');
+            return;
+        }
 
         try {
-            const response = await fetch(`https://smooth-comfort-405104.uc.r.appspot.com/document/createorupdate/items`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MTg5Yjk2Y2FhNWVjNzQ5NDQxMThiNyIsInVzZXJuYW1lIjoibW9oYW1tZWQuZ0Bub3J0aGVhc3Rlcm4uZWR1IiwiaWF0IjoxNzI5NjY1OTQ4LCJleHAiOjE3MzE4MjU5NDh9.zt_Nr2QKj06ocTkCO_fpXrtspfjIbDLJI_MTzT9zWgQ`,
-                },
-                body: formData,
+            const { data } = await createItem({
+                variables: {
+                    input: {
+                        name: itemName,
+                        description: itemDescription,
+                        price: parseFloat(itemPrice),
+                        image: itemImage,
+                        category: itemCategory
+                    }
+                }
             });
 
-            if (response.ok) {
+            if (data.createItem) {
                 alert('Item created successfully!');
                 navigate('/user/dashboard');
-            } else {
-                alert('Failed to create item. Please try again.');
             }
-        } catch (error) {
-            console.error('Error creating item:', error);
+        } catch (err) {
+            console.error('Error creating item:', err);
+            setError(err.message || 'Failed to create item. Please try again.');
         }
     };
 
     return (
-        <Container>
-            <Typography variant="h4" gutterBottom>
+        <Container maxWidth="sm">
+            <Typography variant="h4" gutterBottom sx={{ mt: 3 }}>
                 Create New Listing
             </Typography>
-            <form onSubmit={handleSubmit}>
+            
+            {error && (
+                <Typography color="error" sx={{ mb: 2 }}>
+                    {error}
+                </Typography>
+            )}
+
+            <Box component="form" onSubmit={handleSubmit}>
                 <TextField
                     label="Item Name"
                     variant="outlined"
@@ -61,30 +96,66 @@ const AddItem = () => {
                     variant="outlined"
                     fullWidth
                     margin="normal"
+                    multiline
+                    rows={3}
                     value={itemDescription}
                     onChange={(e) => setItemDescription(e.target.value)}
-                    required
                 />
                 <TextField
-                    label="Item Price"
+                    label="Item Price ($)"
                     variant="outlined"
                     type="number"
                     fullWidth
                     margin="normal"
                     value={itemPrice}
                     onChange={(e) => setItemPrice(e.target.value)}
+                    inputProps={{ min: 0, step: 0.01 }}
                     required
                 />
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setItemImage(e.target.files[0])}
-                    required
+                <TextField
+                    label="Image URL"
+                    variant="outlined"
+                    fullWidth
+                    margin="normal"
+                    value={itemImage}
+                    onChange={(e) => setItemImage(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    helperText="Enter a URL for the item image"
                 />
-                <Button variant="contained" color="primary" type="submit" style={{ marginTop: '20px' }}>
-                    Submit
+                <TextField
+                    label="Category"
+                    variant="outlined"
+                    fullWidth
+                    margin="normal"
+                    select
+                    value={itemCategory}
+                    onChange={(e) => setItemCategory(e.target.value)}
+                >
+                    {categories.map((category) => (
+                        <MenuItem key={category} value={category}>
+                            {category}
+                        </MenuItem>
+                    ))}
+                </TextField>
+                <Button 
+                    variant="contained" 
+                    color="primary" 
+                    type="submit" 
+                    fullWidth
+                    disabled={loading}
+                    sx={{ mt: 3, mb: 2 }}
+                >
+                    {loading ? 'Creating...' : 'Create Listing'}
                 </Button>
-            </form>
+                <Button 
+                    variant="outlined" 
+                    color="secondary" 
+                    fullWidth
+                    onClick={() => navigate('/user/dashboard')}
+                >
+                    Cancel
+                </Button>
+            </Box>
         </Container>
     );
 };

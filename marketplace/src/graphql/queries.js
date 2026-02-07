@@ -6,19 +6,26 @@ export const GET_ME = gql`
     me {
       id
       username
+      email
       role
+      status
+      contactDetails
       createdAt
     }
   }
 `;
 
-// Get all users
+// Get all users - ✅ FIXED: Added email, status, contactDetails, bannedBy
 export const GET_USERS = gql`
   query GetUsers {
     users {
       id
       username
+      email
       role
+      status
+      contactDetails
+      bannedBy
       createdAt
     }
   }
@@ -30,13 +37,17 @@ export const GET_USER_BY_ID = gql`
     userById(id: $id) {
       id
       username
+      email
       role
+      status
+      contactDetails
+      bannedBy
       createdAt
     }
   }
 `;
 
-// Get all items
+// Get all items (marketplace - active only)
 export const GET_ITEMS = gql`
   query GetItems {
     items {
@@ -49,6 +60,26 @@ export const GET_ITEMS = gql`
       image
       category
       inStock
+      createdAt
+    }
+  }
+`;
+
+// Admin: Get all items (including banned)
+export const GET_ALL_ITEMS = gql`
+  query GetAllItems {
+    allItems {
+      id
+      name
+      description
+      price
+      sellerId
+      userName
+      image
+      category
+      inStock
+      status
+      bannedBy
       createdAt
     }
   }

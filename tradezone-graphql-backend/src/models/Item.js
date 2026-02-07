@@ -36,6 +36,15 @@ const itemSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  status: {
+    type: String,
+    enum: ['active', 'banned'],
+    default: 'active'
+  },
+  bannedBy: {
+    type: String,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

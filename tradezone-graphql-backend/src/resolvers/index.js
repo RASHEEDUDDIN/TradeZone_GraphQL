@@ -18,6 +18,14 @@ const requireAuth = (context) => {
   return context.user;
 };
 
+const requireAdmin = (context) => {
+  const user = requireAuth(context);
+  if (user.role !== 'admin') {
+    throw new Error('Admin access required.');
+  }
+  return user;
+};
+
 const resolvers = {
   Query: {
     me: async (_, __, context) => {
@@ -33,8 +41,14 @@ const resolvers = {
       return await User.findById(id);
     },
 
+    // Items for marketplace (only active, in stock)
     items: async () => {
-      return await Item.find({ inStock: true }).sort({ createdAt: -1 });
+      return await Item.find({ inStock: true, status: 'active' }).sort({ createdAt: -1 });
+    },
+
+    // All items for admin (including banned)
+    allItems: async () => {
+      return await Item.find().sort({ createdAt: -1 });
     },
 
     itemById: async (_, { id }) => {
@@ -147,7 +161,8 @@ const resolvers = {
       const item = new Item({
         ...input,
         sellerId: user.id,
-        userName: user.username
+        userName: user.username,
+        status: 'active'
       });
       await item.save();
       return item;
@@ -157,7 +172,7 @@ const resolvers = {
       const user = requireAuth(context);
       const item = await Item.findById(id);
       if (!item) throw new Error('Item not found');
-      if (item.sellerId.toString() !== user.id) {
+      if (item.sellerId.toString() !== user.id && user.role !== 'admin') {
         throw new Error('Not authorized');
       }
       Object.assign(item, input);
@@ -189,11 +204,64 @@ const resolvers = {
     },
 
     updateTransactionStatus: async (_, { id, status }, context) => {
-      const user = requireAuth(context);
-      if (user.role !== 'admin') {
-        throw new Error('Admin access required');
-      }
+      requireAdmin(context);
       return await Transaction.findByIdAndUpdate(id, { status }, { new: true });
+    },
+
+    // Admin: Ban item
+    banItem: async (_, { id, bannedBy }, context) => {
+      requireAdmin(context);
+      const item = await Item.findByIdAndUpdate(
+        id,
+        { status: 'banned', bannedBy },
+        { new: true }
+      );
+      if (!item) throw new Error('Item not found');
+      return item;
+    },
+
+    // Admin: Unban item
+    unbanItem: async (_, { id }, context) => {
+      requireAdmin(context);
+      const item = await Item.findByIdAndUpdate(
+        id,
+        { status: 'active', bannedBy: null },
+        { new: true }
+      );
+      if (!item) throw new Error('Item not found');
+      return item;
+    },
+
+    // Admin: Ban user
+    banUser: async (_, { id, bannedBy }, context) => {
+      requireAdmin(context);
+      const user = await User.findByIdAndUpdate(
+        id,
+        { status: 'banned', bannedBy },
+        { new: true }
+      );
+      if (!user) throw new Error('User not found');
+      return user;
+    },
+
+    // Admin: Unban user
+    unbanUser: async (_, { id }, context) => {
+      requireAdmin(context);
+      const user = await User.findByIdAndUpdate(
+        id,
+        { status: 'active', bannedBy: null },
+        { new: true }
+      );
+      if (!user) throw new Error('User not found');
+      return user;
+    },
+
+    // Admin: Delete user
+    deleteUser: async (_, { id }, context) => {
+      requireAdmin(context);
+      const user = await User.findByIdAndDelete(id);
+      if (!user) throw new Error('User not found');
+      return true;
     }
   },
 

@@ -7,7 +7,8 @@ const typeDefs = gql`
     email: String!
     contactDetails: String
     role: String!
-    status: String
+    status: String!        # ✅ Changed from String to String! (required)
+    bannedBy: String       # ✅ ADDED - This was missing!
     listedItems: [String]
     createdAt: String
   }
@@ -29,6 +30,8 @@ const typeDefs = gql`
     image: String
     category: String
     inStock: Boolean
+    status: String
+    bannedBy: String
     createdAt: String
   }
 
@@ -83,6 +86,7 @@ const typeDefs = gql`
     users: [User!]!
     userById(id: ID!): User
     items: [Item!]!
+    allItems: [Item!]!
     itemById(id: ID!): Item
     itemsBySeller(sellerId: ID!): [Item!]!
     myItems: [Item!]!
@@ -99,6 +103,13 @@ const typeDefs = gql`
     deleteItem(id: ID!): Boolean!
     createTransaction(input: TransactionInput!): Transaction!
     updateTransactionStatus(id: ID!, status: String!): Transaction!
+    
+    # Admin mutations
+    banItem(id: ID!, bannedBy: String!): Item!
+    unbanItem(id: ID!): Item!
+    banUser(id: ID!, bannedBy: String!): User!
+    unbanUser(id: ID!): User!
+    deleteUser(id: ID!): Boolean!
   }
 `;
 
