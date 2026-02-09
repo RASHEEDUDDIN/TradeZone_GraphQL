@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
-import { TextField, Button, Typography, Container, Snackbar } from '@mui/material';
+import { TextField, Button, Typography, Container, Snackbar, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { adminService } from '../services/dbService';
+import { useMutation } from '@apollo/client';
+import { REGISTER } from '../graphql/mutations';
 
 const AdminRegister = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
-    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    // GraphQL mutation for registration
+    const [registerMutation, { loading }] = useMutation(REGISTER);
 
     const validateInput = () => {
         setError('');
+
         if (!username.trim()) {
             setError('Username is required');
             return false;
@@ -22,6 +27,7 @@ const AdminRegister = () => {
             setError('Username must be at least 3 characters long');
             return false;
         }
+
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!email.trim()) {
             setError('Email is required');
@@ -31,6 +37,7 @@ const AdminRegister = () => {
             setError('Invalid email format');
             return false;
         }
+
         if (!password.trim()) {
             setError('Password is required');
             return false;
@@ -39,55 +46,87 @@ const AdminRegister = () => {
             setError('Password must be at least 6 characters long');
             return false;
         }
+
+        if (password !== confirmPassword) {
+            setError('Passwords do not match');
+            return false;
+        }
+
         return true;
     };
 
     const handleRegister = async () => {
         if (!validateInput()) return;
 
-        setLoading(true);
-
         try {
-            const admin = {
-                username,
-                email,
-                password,
-                role: 'admin',
-                registrationTime: new Date().toISOString()
-            };
+            const { data } = await registerMutation({
+                variables: {
+                    input: {
+                        username: username.trim(),
+                        email: email.trim(),
+                        password: password,
+                        contactDetails: '',
+                        role: 'admin'  // ✅ Set role as admin
+                    }
+                }
+            });
 
-            await adminService.register(admin);
-            
-            localStorage.setItem('username', username);
-            localStorage.setItem('userRole', 'admin');
+            const result = data.register;
+
+            if (!result.success) {
+                setError(result.message || 'Registration failed');
+                return;
+            }
+
             setSuccessMessage(`Admin ${username} registered successfully!`);
-            setTimeout(() => navigate('/admin/dashboard'), 2000);
+            
+            // Navigate back to admin dashboard after 2 seconds
+            setTimeout(() => {
+                navigate('/admin/dashboard');
+            }, 2000);
+
         } catch (error) {
             console.error('Error during registration:', error);
             setError(error.message || 'An error occurred during registration. Please try again.');
-        } finally {
-            setLoading(false);
         }
     };
 
     return (
-        <Container maxWidth="sm">
-            <Typography variant="h5" align="center" gutterBottom>Admin Registration</Typography>
-            {error && <Typography color="error">{error}</Typography>}
+        <Container maxWidth="sm" sx={{ py: 4 }}>
+            <Typography variant="h4" align="center" gutterBottom>
+                Create New Admin
+            </Typography>
+            <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 3 }}>
+                Register a new administrator account
+            </Typography>
+
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                </Alert>
+            )}
+
             <TextField
                 label="Username"
                 fullWidth
                 margin="normal"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                disabled={loading}
+                required
             />
+
             <TextField
                 label="Email"
+                type="email"
                 fullWidth
                 margin="normal"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
             />
+
             <TextField
                 label="Password"
                 type="password"
@@ -95,23 +134,55 @@ const AdminRegister = () => {
                 margin="normal"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                required
+                helperText="Minimum 6 characters"
             />
+
+            <TextField
+                label="Confirm Password"
+                type="password"
+                fullWidth
+                margin="normal"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={loading}
+                required
+            />
+
             <Button
                 variant="contained"
                 color="primary"
                 fullWidth
+                size="large"
                 onClick={handleRegister}
-                sx={{ mt: 2 }}
                 disabled={loading}
+                sx={{ mt: 3 }}
             >
-                {loading ? 'Registering...' : 'Register Admin'}
+                {loading ? 'Creating Admin...' : 'Create Admin Account'}
             </Button>
+
+            <Button
+                variant="outlined"
+                color="secondary"
+                fullWidth
+                onClick={() => navigate('/admin/dashboard')}
+                disabled={loading}
+                sx={{ mt: 2 }}
+            >
+                Back to Dashboard
+            </Button>
+
             <Snackbar
                 open={Boolean(successMessage)}
-                autoHideDuration={6000}
+                autoHideDuration={3000}
                 onClose={() => setSuccessMessage('')}
-                message={successMessage}
-            />
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert severity="success" sx={{ width: '100%' }}>
+                    {successMessage}
+                </Alert>
+            </Snackbar>
         </Container>
     );
 };
