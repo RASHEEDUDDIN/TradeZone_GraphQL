@@ -40,12 +40,12 @@ const transactionSchema = new mongoose.Schema({
   }
 });
 
-// Generate orderId before saving
-transactionSchema.pre('save', function(next) {
+// Generate orderId before saving - ✅ Fixed: Removed next() call
+transactionSchema.pre('save', function() {
   if (!this.orderId) {
-    this.orderId = `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
   }
-  next();
+  // ✅ No next() needed for synchronous operations in Mongoose 5+
 });
 
 module.exports = mongoose.model('Transaction', transactionSchema);

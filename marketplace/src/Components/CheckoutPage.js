@@ -7,8 +7,7 @@ import { useMutation } from '@apollo/client';
 import { CREATE_TRANSACTION } from '../graphql/mutations';
 
 const CheckoutPage = () => {
-    const { userName, cart = [] } = useSelector((state) => state.auth);
-    const userId = localStorage.getItem('userId');
+    const { cart = [] } = useSelector((state) => state.auth);
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
@@ -22,16 +21,34 @@ const CheckoutPage = () => {
     // GraphQL mutation for creating transaction
     const [createTransactionMutation, { loading }] = useMutation(CREATE_TRANSACTION);
 
+    // Helper functions to get item fields (handles both field name formats)
+    const getItemName = (item) => item.itemName || item.name || 'Unknown Item';
+    const getItemPrice = (item) => {
+        const price = item.itemPrice || item.price;
+        return parseFloat(price) || 0;
+    };
+    const getItemId = (item) => item.id || item._id;
+
     // Validate cart items
     const validateCart = () => {
         if (cart.length === 0) {
             alert('Your cart is empty. Please add items before checkout.');
             return false;
         }
-        if (!cart.every(item => item.itemName && item.itemPrice)) {
+        
+        // Check if all items have valid names and prices
+        const invalidItems = cart.filter(item => {
+            const name = getItemName(item);
+            const price = getItemPrice(item);
+            return !name || price <= 0;
+        });
+
+        if (invalidItems.length > 0) {
+            console.error('Invalid cart items:', invalidItems);
             alert('Some items in your cart are invalid. Please check your cart.');
             return false;
         }
+        
         return true;
     };
 
@@ -50,16 +67,18 @@ const CheckoutPage = () => {
         }
 
         try {
-            // Prepare transaction items for GraphQL
+            // Prepare transaction items for GraphQL using helper functions
             const items = cart.map(item => ({
-                itemId: item.id || item._id,
-                name: item.itemName,
-                price: parseFloat(item.itemPrice),
+                itemId: getItemId(item),
+                name: getItemName(item),
+                price: getItemPrice(item),
                 quantity: item.quantity || 1,
             }));
 
             // Calculate total amount
             const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+            console.log('Creating transaction with items:', items);
 
             // Call GraphQL mutation
             const { data } = await createTransactionMutation({
@@ -89,8 +108,8 @@ const CheckoutPage = () => {
         }
     };
 
-    // Calculate total for display
-    const totalAmount = cart.reduce((total, item) => total + parseFloat(item.itemPrice || 0), 0);
+    // Calculate total for display using helper function
+    const totalAmount = cart.reduce((total, item) => total + getItemPrice(item), 0);
 
     return (
         <Container maxWidth="sm" sx={{ py: 4 }}>
