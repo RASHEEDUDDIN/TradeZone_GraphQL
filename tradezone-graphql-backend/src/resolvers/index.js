@@ -2,6 +2,11 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Item = require('../models/Item');
 const Transaction = require('../models/Transaction');
+const TransactionPG = require('../models/TransactionPG');
+const redisClient = require('../../config/redis');
+
+const ITEMS_CACHE_KEY = 'marketplace:items:active';
+const ITEMS_CACHE_TTL = 3600;
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -43,7 +48,18 @@ const resolvers = {
 
     // Items for marketplace (only active, in stock)
     items: async () => {
-      return await Item.find({ inStock: true, status: 'active' }).sort({ createdAt: -1 });
+      const cachedItems = await redisClient.get(ITEMS_CACHE_KEY);
+      if (cachedItems) {
+        return JSON.parse(cachedItems);
+      }
+
+      const dbItems = await Item.find({ inStock: true, status: 'active' }).sort({ createdAt: -1 });
+
+      if (dbItems.length > 0) {
+        await redisClient.setEx(ITEMS_CACHE_KEY, ITEMS_CACHE_TTL, JSON.stringify(dbItems));
+      }
+
+      return dbItems;
     },
 
     // All items for admin (including banned)
@@ -165,6 +181,7 @@ const resolvers = {
         status: 'active'
       });
       await item.save();
+      await redisClient.del(ITEMS_CACHE_KEY).catch(() => {});
       return item;
     },
 
@@ -177,6 +194,7 @@ const resolvers = {
       }
       Object.assign(item, input);
       await item.save();
+      await redisClient.del(ITEMS_CACHE_KEY).catch(() => {});
       return item;
     },
 
@@ -188,6 +206,7 @@ const resolvers = {
         throw new Error('Not authorized');
       }
       await Item.findByIdAndDelete(id);
+      await redisClient.del(ITEMS_CACHE_KEY).catch(() => {});
       return true;
     },
 
@@ -200,6 +219,22 @@ const resolvers = {
         status: 'completed'
       });
       await transaction.save();
+
+      // Dual-write to PostgreSQL (fail-silent)
+      if (TransactionPG) {
+        try {
+          await TransactionPG.create({
+            orderId: transaction.orderId,
+            userId: transaction.userId.toString(),
+            items: transaction.items,
+            totalAmount: transaction.totalAmount,
+            status: transaction.status
+          });
+        } catch (pgError) {
+          console.error('Failed to dual-write transaction to PostgreSQL:', pgError.message);
+        }
+      }
+
       return transaction;
     },
 
@@ -217,6 +252,7 @@ const resolvers = {
         { new: true }
       );
       if (!item) throw new Error('Item not found');
+      await redisClient.del(ITEMS_CACHE_KEY).catch(() => {});
       return item;
     },
 
@@ -229,6 +265,7 @@ const resolvers = {
         { new: true }
       );
       if (!item) throw new Error('Item not found');
+      await redisClient.del(ITEMS_CACHE_KEY).catch(() => {});
       return item;
     },
 

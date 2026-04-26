@@ -1,0 +1,20 @@
+[
+  {
+    "query": "Query by userId",
+    "execution_time_before_ms": 0.307,
+    "execution_time_after_ms": 0.062,
+    "improvement_pct": 79.8
+  },
+  {
+    "query": "Query by status",
+    "execution_time_before_ms": 0.23,
+    "execution_time_after_ms": 0.145,
+    "improvement_pct": 36.96
+  },
+  {
+    "query": "Query by recent createdAt",
+    "execution_time_before_ms": 0.366,
+    "execution_time_after_ms": 0.152,
+    "improvement_pct": 58.47
+  }
+]

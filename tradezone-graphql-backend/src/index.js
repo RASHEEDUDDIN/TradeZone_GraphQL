@@ -20,19 +20,19 @@ mongoose.connect(process.env.MONGODB_URI)
 const server = new ApolloServer({
   typeDefs,
   resolvers,
-  context: ({ req }) => {
-    const token = req.headers.authorization?.replace('Bearer ', '') || '';
-    let user = null;
-    
-    if (token) {
-      try {
-        user = jwt.verify(token, process.env.JWT_SECRET);
-      } catch (err) {
-        console.log('Invalid token');
-      }
+context: ({ req }) => {
+  const token = req.headers.authorization?.replace('Bearer ', '') || '';
+  let user = null;
+  
+  if (token) {
+    try {
+      user = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      // invalid or expired token — user stays null, that's fine
     }
-    return { user };
   }
+  return { user };
+}
 });
 
 async function startServer() {
