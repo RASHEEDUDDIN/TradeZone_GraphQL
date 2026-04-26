@@ -1,8 +1,10 @@
 # 🛍️ TradeZone Marketplace
 
-A full-stack e-commerce marketplace application built with **React**, **GraphQL**, **Node.js**, and **MongoDB**. Users can buy and sell items, while administrators can manage users, items, and transactions.
+A full-stack e-commerce marketplace application built with **React**, **GraphQL**, **Node.js**, **MongoDB**, **PostgreSQL**, and **Redis**. It features a robust polyglot persistence architecture, caching, and comprehensive administration tools. Users can buy and sell items, while administrators can manage users, items, and transactions.
 
 [![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![GraphQL](https://img.shields.io/badge/GraphQL-E10098?style=for-the-badge&logo=graphql&logoColor=white)](https://graphql.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -31,6 +33,9 @@ A full-stack e-commerce marketplace application built with **React**, **GraphQL*
 - ➕ Create new admin accounts
 
 ### 🎯 Additional Features
+- ⚡ **Redis Caching** for high-performance item retrieval
+- 🗄️ **Polyglot Persistence**: MongoDB as primary DB, PostgreSQL (Supabase) for transaction dual-writes
+- 🧪 **Jest Regression Tests** and benchmark scripts included
 - 🎨 Modern, responsive UI with Material-UI
 - 🔄 Real-time data updates with Apollo Client
 - 🔒 Secure authentication with JWT tokens
@@ -55,8 +60,12 @@ A full-stack e-commerce marketplace application built with **React**, **GraphQL*
 - **Node.js** - Runtime environment
 - **Express** - Web framework
 - **Apollo Server** - GraphQL server
-- **MongoDB** - Database
+- **MongoDB** - Primary database
 - **Mongoose** - ODM for MongoDB
+- **PostgreSQL (Supabase)** - Relational database for transaction dual-writes
+- **Sequelize** - ORM for PostgreSQL
+- **Redis** - In-memory caching
+- **Jest** - Testing framework
 - **JWT** - Authentication
 - **bcryptjs** - Password hashing
 
@@ -68,6 +77,8 @@ Before you begin, ensure you have the following installed:
 - **Node.js** (v14 or higher)
 - **npm** or **yarn**
 - **MongoDB** (local or MongoDB Atlas account)
+- **Redis** (optional, but recommended for caching)
+- **PostgreSQL** (optional, via local or Supabase, for transaction dual-writes)
 
 ---
 
@@ -88,11 +99,17 @@ npm install
 ```
 
 #### Environment Variables
-Create a `.env` file in the `backend` folder:
+Create a `.env` file in the `tradezone-graphql-backend` folder:
 ```env
 MONGODB_URI=mongodb://localhost:27017/tradezone
 # Or use MongoDB Atlas:
 # MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/tradezone
+
+# Optional: Supabase PostgreSQL for dual-writes
+DATABASE_URL=postgresql://postgres:password@db.supabase.co:5432/postgres
+
+# Optional: Redis URL for caching
+REDIS_URL=redis://localhost:6379
 
 JWT_SECRET=your_super_secret_jwt_key_here_change_this
 PORT=4000
@@ -125,16 +142,20 @@ Frontend will run on `http://localhost:3000`
 ```
 tradezone-marketplace/
 │
-├── backend/                    # Backend (GraphQL API)
-│   ├── models/                 # Mongoose models
+├── tradezone-graphql-backend/  # Backend (GraphQL API)
+│   ├── config/                 # DB & Redis configs
+│   ├── models/                 # Mongoose & Sequelize models
 │   │   ├── User.js
 │   │   ├── Item.js
-│   │   └── Transaction.js
+│   │   ├── Transaction.js
+│   │   └── TransactionPG.js
 │   ├── schema/                 # GraphQL schema
 │   │   └── typeDefs.js
 │   ├── resolvers/              # GraphQL resolvers
 │   │   └── index.js
-│   ├── index.js               # Server entry point
+│   ├── scripts/                # Benchmark queries
+│   ├── __tests__/              # Jest regression tests
+│   ├── index.js                # Server entry point
 │   ├── package.json
 │   └── .env
 │
