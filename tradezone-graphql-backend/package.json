@@ -30,5 +30,10 @@
     "babel-jest": "^30.3.0",
     "jest": "^30.3.0",
     "nodemon": "^3.1.11"
+  },
+  "jest": {
+    "moduleNameMapper": {
+      ".*/config/database$": "<rootDir>/__mocks__/database.js"
+    }
   }
 }
