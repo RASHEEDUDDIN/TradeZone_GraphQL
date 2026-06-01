@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    name: Backend Jest Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: cd tradezone-graphql-backend && npm ci
+      - name: Run Jest tests
+        run: cd tradezone-graphql-backend && npm test -- --coverage
+        env:
+          JWT_SECRET: test-secret-for-ci
+
+  frontend-tests:
+    name: Frontend Jest Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: cd marketplace && npm ci
+      - name: Run Jest tests
+        run: cd marketplace && npm test -- --watchAll=false --coverage
